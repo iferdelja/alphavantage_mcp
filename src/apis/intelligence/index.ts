@@ -66,65 +66,78 @@ const SUPPORTED_INTERVALS = [
  * Format Alpha Vantage market news and sentiment data into a readable string
  */
 function formatMarketNewsSentiment(newsData: NewsMarketSentimentResponse): string {
-    if (newsData.Information) {
-        return `Error: ${newsData.Information}`;
-    }
-
-    if (newsData.Note) {
-        return `Note: ${newsData.Note}`;
-    }
-
-    const feed = newsData.feed;
-    if (!feed || feed.length === 0) {
-        return "No news data available";
-    }
-
-    const result = ["Market News & Sentiment"];
-
-    if (newsData.sentiment_score_definition) {
-        result.push(`\nSentiment Score: ${newsData.sentiment_score_definition}`);
-    }
-
-    if (newsData.relevance_score_definition) {
-        result.push(`Relevance Score: ${newsData.relevance_score_definition}`);
-    }
-
-    result.push(`\nShowing ${feed.length} articles ${newsData.items ? `(of ${newsData.items} total)` : ""}`);
-
-    feed.forEach((article, index) => {
-        result.push(`\n=== Article ${index + 1} ===`);
-        result.push(`Title: ${article.title || "N/A"}`);
-        result.push(`Published: ${formatTimePublished(article.time_published) || "N/A"}`);
-        result.push(`Source: ${article.source || "N/A"}${article.category_within_source ? ` (${article.category_within_source})` : ""}`);
-
-        if (article.authors && article.authors.length > 0) {
-            result.push(`Authors: ${article.authors.join(", ")}`);
+    try {
+        if (newsData.Information) {
+            console.error("Error: ", newsData.Information);
+            return `Error: ${newsData.Information}`;
         }
 
-        result.push(`URL: ${article.url || "N/A"}`);
-
-        if (article.summary) {
-            result.push(`\nSummary: ${article.summary}`);
+        if (newsData.Note) {
+            console.error("Note: ", newsData.Note);
+            return `Note: ${newsData.Note}`;
         }
 
-        result.push(`Overall Sentiment: ${article.overall_sentiment_label || "N/A"} (${article.overall_sentiment_score || "N/A"})`);
-
-        if (article.topics && article.topics.length > 0) {
-            result.push(`\nTopics:`);
-            article.topics.forEach(topic => {
-                result.push(`- ${topic.topic || "N/A"} (Relevance: ${topic.relevance_score || "N/A"})`);
-            });
+        const feed = newsData.feed;
+        if (!feed || feed.length === 0) {
+            console.error("No news data available");
+            return "No news data available";
         }
 
-        if (article.ticker_sentiment && article.ticker_sentiment.length > 0) {
-            result.push(`\nTicker Sentiment:`);
-            article.ticker_sentiment.forEach(ticker => {
-                result.push(`- ${ticker.ticker || "N/A"}: ${ticker.ticker_sentiment_label || "N/A"} (Score: ${ticker.ticker_sentiment_score || "N/A"}, Relevance: ${ticker.relevance_score || "N/A"})`);
-            });
-        }
-    });
+        const result = ["Market News & Sentiment"];
 
-    return result.join("\n");
+        if (newsData.sentiment_score_definition) {
+            result.push(`\nSentiment Score: ${newsData.sentiment_score_definition}`);
+        }
+
+        if (newsData.relevance_score_definition) {
+            result.push(`Relevance Score: ${newsData.relevance_score_definition}`);
+        }
+
+        // Limit to first 10 items
+        const limitedFeed = feed.slice(0, 10);
+
+        result.push(`\nShowing ${limitedFeed.length} articles ${newsData.items ? `(of ${newsData.items} total)` : ""}`);
+
+        console.error("feed", "length", limitedFeed.length);
+
+        limitedFeed.forEach((article, index) => {
+            result.push(`\n=== Article ${index + 1} ===`);
+            result.push(`Title: ${article.title || "N/A"}`);
+            result.push(`Published: ${formatTimePublished(article.time_published) || "N/A"}`);
+            result.push(`Source: ${article.source || "N/A"}${article.category_within_source ? ` (${article.category_within_source})` : ""}`);
+
+            if (article.authors && article.authors.length > 0) {
+                result.push(`Authors: ${article.authors.join(", ")}`);
+            }
+
+            result.push(`URL: ${article.url || "N/A"}`);
+
+            if (article.summary) {
+                result.push(`\nSummary: ${article.summary}`);
+            }
+
+            result.push(`Overall Sentiment: ${article.overall_sentiment_label || "N/A"} (${article.overall_sentiment_score || "N/A"})`);
+
+            if (article.topics && article.topics.length > 0) {
+                result.push(`\nTopics:`);
+                article.topics.forEach(topic => {
+                    result.push(`- ${topic.topic || "N/A"} (Relevance: ${topic.relevance_score || "N/A"})`);
+                });
+            }
+
+            if (article.ticker_sentiment && article.ticker_sentiment.length > 0) {
+                result.push(`\nTicker Sentiment:`);
+                article.ticker_sentiment.forEach(ticker => {
+                    result.push(`- ${ticker.ticker || "N/A"}: ${ticker.ticker_sentiment_label || "N/A"} (Score: ${ticker.ticker_sentiment_score || "N/A"}, Relevance: ${ticker.relevance_score || "N/A"})`);
+                });
+            }
+        });
+
+        return result.join("\n");
+    } catch (error) {
+        console.error("Error formatting market news and sentiment:", error);
+        return "Error processing market news and sentiment data. Please try again later.";
+    }
 }
 
 /**
