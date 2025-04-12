@@ -6,6 +6,7 @@ import { registerFundamentalApis } from "./fundamental/index.js";
 import { registerForexApis } from "./forex/index.js";
 import { registerCryptoApis } from "./crypto/index.js";
 import { registerCommoditiesApis } from "./commodities/index.js";
+import { registerEconomicApis } from "./economic/index.js";
 
 /**
  * Register all API endpoints with the server
@@ -31,6 +32,9 @@ export function registerAllApis(server: McpServer) {
 
     // Register commodities APIs
     registerCommoditiesApis(server);
+
+    // Register economic indicators APIs
+    registerEconomicApis(server);
 
     // Future API groups can be registered here
     // registerTechnicalApis(server);
