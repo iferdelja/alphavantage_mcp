@@ -5,8 +5,8 @@ A Model Context Protocol (MCP) server for accessing [Alpha Vantage](https://www.
 ## Features
 
 - Complete support for all Alpha Vantage API endpoints including stocks, economic indicators, technical indicators, forex, cryptocurrencies, and commodities
-- Optimized API organization with consolidated endpoints for technical indicators, forex, commodities, and cryptocurrencies to reduce context window usage
-- Formatted and readable output for all financial data
+
+-  For reduced context window usage, certain endpoints are organized under same tool (technical indicators, forex, commodities, and cryptocurrencies)
 
 ## API Organization
 
