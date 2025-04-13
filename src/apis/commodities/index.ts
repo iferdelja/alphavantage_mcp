@@ -64,24 +64,44 @@ function formatCommodityData(commodityData: CommodityResponse, limit: number = 1
 }
 
 /**
- * Create a generic commodity endpoint function
+ * Register all commodities APIs with the server
  */
-function createCommodityEndpoint<T extends CommodityResponse>(
-    server: McpServer,
-    name: string,
-    functionName: string,
-    description: string
-) {
+export function registerCommoditiesApis(server: McpServer) {
     server.tool(
-        name,
-        description,
+        "get-commodity",
+        "Get global commodity prices for various types",
         {
-            interval: z.enum(["daily", "weekly", "monthly", "quarterly", "annual"]).optional().describe("Time interval between data points (default: monthly)"),
-            limit: z.number().optional().describe("Number of data points to display (default: 10)")
+            commodity_type: z.enum([
+                "WTI", "BRENT", "NATURAL_GAS", "COPPER", "ALUMINUM",
+                "WHEAT", "CORN", "COTTON", "SUGAR", "COFFEE", "ALL_COMMODITIES"
+            ]).describe("The type of commodity data to retrieve"),
+            interval: z.enum(["daily", "weekly", "monthly", "quarterly", "annual"])
+                .optional()
+                .describe("Time interval between data points (default: monthly)"),
+            limit: z.number()
+                .optional()
+                .describe("Number of data points to display (default: 10)")
         },
-        async ({ interval = "monthly", limit = 10 }) => {
-            const response = await makeAlphaVantageRequest<T>({
-                function: functionName,
+        async (args) => {
+            const { commodity_type, interval = "monthly", limit = 10 } = args;
+
+            // Map commodity types to their descriptions for better error messages
+            const commodityDescriptions: Record<string, string> = {
+                "WTI": "West Texas Intermediate (WTI) crude oil prices",
+                "BRENT": "Brent (Europe) crude oil prices",
+                "NATURAL_GAS": "natural gas prices",
+                "COPPER": "global copper prices",
+                "ALUMINUM": "global aluminum prices",
+                "WHEAT": "global wheat prices",
+                "CORN": "global corn prices",
+                "COTTON": "global cotton prices",
+                "SUGAR": "global sugar prices",
+                "COFFEE": "global coffee prices",
+                "ALL_COMMODITIES": "global price index of all commodities"
+            };
+
+            const response = await makeAlphaVantageRequest<CommodityResponse>({
+                function: commodity_type,
                 interval
             });
 
@@ -90,7 +110,7 @@ function createCommodityEndpoint<T extends CommodityResponse>(
                     content: [
                         {
                             type: "text",
-                            text: `Error: Failed to fetch ${description.toLowerCase()}.`
+                            text: `Error: Failed to fetch ${commodityDescriptions[commodity_type] || 'commodity data'}.`
                         }
                     ]
                 };
@@ -105,98 +125,5 @@ function createCommodityEndpoint<T extends CommodityResponse>(
                 ]
             };
         }
-    );
-}
-
-/**
- * Register all commodities APIs with the server
- */
-export function registerCommoditiesApis(server: McpServer) {
-    // Crude Oil (WTI) endpoint
-    createCommodityEndpoint<WTIResponse>(
-        server,
-        "get-wti",
-        "WTI",
-        "Get West Texas Intermediate (WTI) crude oil prices"
-    );
-
-    // Crude Oil (Brent) endpoint
-    createCommodityEndpoint<BrentResponse>(
-        server,
-        "get-brent",
-        "BRENT",
-        "Get Brent (Europe) crude oil prices"
-    );
-
-    // Natural Gas endpoint
-    createCommodityEndpoint<NaturalGasResponse>(
-        server,
-        "get-natural-gas",
-        "NATURAL_GAS",
-        "Get natural gas prices"
-    );
-
-    // Copper endpoint
-    createCommodityEndpoint<CopperResponse>(
-        server,
-        "get-copper",
-        "COPPER",
-        "Get global copper prices"
-    );
-
-    // Aluminum endpoint
-    createCommodityEndpoint<AluminumResponse>(
-        server,
-        "get-aluminum",
-        "ALUMINUM",
-        "Get global aluminum prices"
-    );
-
-    // Wheat endpoint
-    createCommodityEndpoint<WheatResponse>(
-        server,
-        "get-wheat",
-        "WHEAT",
-        "Get global wheat prices"
-    );
-
-    // Corn endpoint
-    createCommodityEndpoint<CornResponse>(
-        server,
-        "get-corn",
-        "CORN",
-        "Get global corn prices"
-    );
-
-    // Cotton endpoint
-    createCommodityEndpoint<CottonResponse>(
-        server,
-        "get-cotton",
-        "COTTON",
-        "Get global cotton prices"
-    );
-
-    // Sugar endpoint
-    createCommodityEndpoint<SugarResponse>(
-        server,
-        "get-sugar",
-        "SUGAR",
-        "Get global sugar prices"
-    );
-
-    // Coffee endpoint
-    createCommodityEndpoint<CoffeeResponse>(
-        server,
-        "get-coffee",
-        "COFFEE",
-        "Get global coffee prices"
-    );
-
-    // Global Commodities Index endpoint
-    createCommodityEndpoint<GlobalCommoditiesIndexResponse>(
-        server,
-        "get-global-commodities-index",
-        "ALL_COMMODITIES",
-        "Get global price index of all commodities"
     );
 } 

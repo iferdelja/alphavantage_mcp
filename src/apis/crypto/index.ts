@@ -294,6 +294,20 @@ function formatDigitalCurrencyMonthly(timeSeriesData: DigitalCurrencyMonthlyResp
 }
 
 /**
+ * Get the appropriate formatter based on the series type
+ */
+function getFormatterBySeries(seriesType: string): (response: any, limit: number) => string {
+    const formatters: Record<string, any> = {
+        "CRYPTO_INTRADAY": formatCryptoIntradaySeries,
+        "DIGITAL_CURRENCY_DAILY": formatDigitalCurrencyDaily,
+        "DIGITAL_CURRENCY_WEEKLY": formatDigitalCurrencyWeekly,
+        "DIGITAL_CURRENCY_MONTHLY": formatDigitalCurrencyMonthly
+    };
+
+    return formatters[seriesType] || formatDigitalCurrencyDaily;
+}
+
+/**
  * Register all cryptocurrency APIs with the server
  */
 export function registerCryptoApis(server: McpServer) {
@@ -334,156 +348,79 @@ export function registerCryptoApis(server: McpServer) {
         }
     );
 
-    // Crypto Intraday endpoint
+    // Unified crypto time series endpoint
     server.tool(
-        "get-crypto-intraday",
-        "Get intraday time series data for a cryptocurrency",
+        "get-digital-currency",
+        "Get time series data for a digital currency with various intervals",
         {
+            series_type: z.enum([
+                "intraday", "daily", "weekly", "monthly"
+            ]).describe("The type of time series data to retrieve"),
             symbol: z.string().describe("The cryptocurrency symbol (e.g., BTC)"),
             market: z.string().describe("The exchange market (e.g., USD)"),
-            interval: z.enum(["1min", "5min", "15min", "30min", "60min"]).describe("Time interval between data points"),
-            outputsize: z.enum(["compact", "full"]).optional().describe("Data size: 'compact' (last 100 data points) or 'full' (trailing 30 days)"),
+            interval: z.enum(["1min", "5min", "15min", "30min", "60min"]).optional()
+                .describe("Time interval between data points (required for intraday series)"),
+            outputsize: z.enum(["compact", "full"]).optional()
+                .describe("Data size for intraday: 'compact' (last 100 data points) or 'full' (trailing 30 days)"),
             limit: z.number().optional().describe("Number of data points to display (default: 10)")
         },
-        async ({ symbol, market, interval, outputsize = "compact", limit = 10 }) => {
-            const response = await makeAlphaVantageRequest<CryptoIntradayResponse>({
-                function: "CRYPTO_INTRADAY",
-                symbol,
-                market,
-                interval,
-                outputsize
-            });
+        async (args) => {
+            const { series_type, symbol, market, interval, outputsize = "compact", limit = 10 } = args;
 
-            if (!response) {
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: "Error: Failed to fetch crypto intraday data."
-                        }
-                    ]
-                };
-            }
-
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: formatCryptoIntradaySeries(response, limit)
-                    }
-                ]
+            // Map the user-friendly series_type to the actual API function
+            const functionMap: Record<string, string> = {
+                "intraday": "CRYPTO_INTRADAY",
+                "daily": "DIGITAL_CURRENCY_DAILY",
+                "weekly": "DIGITAL_CURRENCY_WEEKLY",
+                "monthly": "DIGITAL_CURRENCY_MONTHLY"
             };
-        }
-    );
 
-    // Digital Currency Daily endpoint
-    server.tool(
-        "get-digital-currency-daily",
-        "Get daily time series data for a digital currency",
-        {
-            symbol: z.string().describe("The cryptocurrency symbol (e.g., BTC)"),
-            market: z.string().describe("The exchange market (e.g., USD)"),
-            limit: z.number().optional().describe("Number of data points to display (default: 10)")
-        },
-        async ({ symbol, market, limit = 10 }) => {
-            const response = await makeAlphaVantageRequest<DigitalCurrencyDailyResponse>({
-                function: "DIGITAL_CURRENCY_DAILY",
+            const function_name = functionMap[series_type];
+
+            // Create the API params object
+            const apiParams: Record<string, string> = {
+                function: function_name,
                 symbol,
                 market
-            });
-
-            if (!response) {
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: "Error: Failed to fetch digital currency daily data."
-                        }
-                    ]
-                };
-            }
-
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: formatDigitalCurrencyDaily(response, limit)
-                    }
-                ]
             };
-        }
-    );
 
-    // Digital Currency Weekly endpoint
-    server.tool(
-        "get-digital-currency-weekly",
-        "Get weekly time series data for a digital currency",
-        {
-            symbol: z.string().describe("The cryptocurrency symbol (e.g., BTC)"),
-            market: z.string().describe("The exchange market (e.g., USD)"),
-            limit: z.number().optional().describe("Number of data points to display (default: 10)")
-        },
-        async ({ symbol, market, limit = 10 }) => {
-            const response = await makeAlphaVantageRequest<DigitalCurrencyWeeklyResponse>({
-                function: "DIGITAL_CURRENCY_WEEKLY",
-                symbol,
-                market
-            });
+            // Add interval and outputsize only for intraday
+            if (series_type === "intraday") {
+                if (!interval) {
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: "Error: interval parameter is required for intraday data."
+                            }
+                        ]
+                    };
+                }
+                apiParams.interval = interval;
+                apiParams.outputsize = outputsize;
+            }
+
+            const response = await makeAlphaVantageRequest<any>(apiParams);
 
             if (!response) {
                 return {
                     content: [
                         {
                             type: "text",
-                            text: "Error: Failed to fetch digital currency weekly data."
+                            text: `Error: Failed to fetch ${series_type} cryptocurrency data.`
                         }
                     ]
                 };
             }
 
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: formatDigitalCurrencyWeekly(response, limit)
-                    }
-                ]
-            };
-        }
-    );
-
-    // Digital Currency Monthly endpoint
-    server.tool(
-        "get-digital-currency-monthly",
-        "Get monthly time series data for a digital currency",
-        {
-            symbol: z.string().describe("The cryptocurrency symbol (e.g., BTC)"),
-            market: z.string().describe("The exchange market (e.g., USD)"),
-            limit: z.number().optional().describe("Number of data points to display (default: 10)")
-        },
-        async ({ symbol, market, limit = 10 }) => {
-            const response = await makeAlphaVantageRequest<DigitalCurrencyMonthlyResponse>({
-                function: "DIGITAL_CURRENCY_MONTHLY",
-                symbol,
-                market
-            });
-
-            if (!response) {
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: "Error: Failed to fetch digital currency monthly data."
-                        }
-                    ]
-                };
-            }
+            // Get the appropriate formatter based on the series type
+            const formatter = getFormatterBySeries(function_name);
 
             return {
                 content: [
                     {
                         type: "text",
-                        text: formatDigitalCurrencyMonthly(response, limit)
+                        text: formatter(response, limit)
                     }
                 ]
             };

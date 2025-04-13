@@ -183,6 +183,19 @@ function formatFxMonthlyTimeSeries(timeSeriesData: FxMonthlyResponse, limit: num
 }
 
 /**
+ * Get the appropriate formatter based on the series type
+ */
+function getFormatterBySeries(seriesType: string): (response: any, limit: number) => string {
+    const formatters: Record<string, any> = {
+        "FX_DAILY": formatFxDailyTimeSeries,
+        "FX_WEEKLY": formatFxWeeklyTimeSeries,
+        "FX_MONTHLY": formatFxMonthlyTimeSeries
+    };
+
+    return formatters[seriesType] || formatFxDailyTimeSeries;
+}
+
+/**
  * Register all forex (FX) APIs with the server
  */
 export function registerForexApis(server: McpServer) {
@@ -223,116 +236,64 @@ export function registerForexApis(server: McpServer) {
         }
     );
 
-    // Daily FX endpoint
+    // Unified FX time series endpoint
     server.tool(
-        "get-fx-daily",
-        "Get daily time series of a forex currency pair",
+        "get-fx-series",
+        "Get time series data of a forex currency pair",
         {
+            series_type: z.enum(["daily", "weekly", "monthly"])
+                .describe("The type of time series data to retrieve"),
             from_symbol: z.string().describe("The source currency (e.g., EUR)"),
             to_symbol: z.string().describe("The target currency (e.g., USD)"),
-            outputsize: z.enum(["compact", "full"]).optional().describe("Data size: 'compact' (last 100 data points) or 'full' (full-length time series)"),
+            outputsize: z.enum(["compact", "full"]).optional()
+                .describe("Data size: 'compact' (last 100 data points) or 'full' (full-length time series) - only applies to daily series"),
             limit: z.number().optional().describe("Number of data points to display (default: 10)")
         },
-        async ({ from_symbol, to_symbol, outputsize = "compact", limit = 10 }) => {
-            const response = await makeAlphaVantageRequest<FxDailyResponse>({
-                function: "FX_DAILY",
-                from_symbol,
-                to_symbol,
-                outputsize
-            });
+        async (args) => {
+            const { series_type, from_symbol, to_symbol, outputsize = "compact", limit = 10 } = args;
 
-            if (!response) {
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: "Error: Failed to fetch daily FX data."
-                        }
-                    ]
-                };
-            }
-
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: formatFxDailyTimeSeries(response, limit)
-                    }
-                ]
+            // Map the user-friendly series_type to the actual API function
+            const functionMap: Record<string, string> = {
+                "daily": "FX_DAILY",
+                "weekly": "FX_WEEKLY",
+                "monthly": "FX_MONTHLY"
             };
-        }
-    );
 
-    // Weekly FX endpoint
-    server.tool(
-        "get-fx-weekly",
-        "Get weekly time series of a forex currency pair",
-        {
-            from_symbol: z.string().describe("The source currency (e.g., EUR)"),
-            to_symbol: z.string().describe("The target currency (e.g., USD)"),
-            limit: z.number().optional().describe("Number of data points to display (default: 10)")
-        },
-        async ({ from_symbol, to_symbol, limit = 10 }) => {
-            const response = await makeAlphaVantageRequest<FxWeeklyResponse>({
-                function: "FX_WEEKLY",
+            const function_name = functionMap[series_type];
+
+            // Create the API params object
+            const apiParams: Record<string, string> = {
+                function: function_name,
                 from_symbol,
                 to_symbol
-            });
-
-            if (!response) {
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: "Error: Failed to fetch weekly FX data."
-                        }
-                    ]
-                };
-            }
-
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: formatFxWeeklyTimeSeries(response, limit)
-                    }
-                ]
             };
-        }
-    );
 
-    // Monthly FX endpoint
-    server.tool(
-        "get-fx-monthly",
-        "Get monthly time series of a forex currency pair",
-        {
-            from_symbol: z.string().describe("The source currency (e.g., EUR)"),
-            to_symbol: z.string().describe("The target currency (e.g., USD)"),
-            limit: z.number().optional().describe("Number of data points to display (default: 10)")
-        },
-        async ({ from_symbol, to_symbol, limit = 10 }) => {
-            const response = await makeAlphaVantageRequest<FxMonthlyResponse>({
-                function: "FX_MONTHLY",
-                from_symbol,
-                to_symbol
-            });
+            // Add outputsize only for daily series
+            if (series_type === "daily") {
+                apiParams.outputsize = outputsize;
+            }
+
+            const response = await makeAlphaVantageRequest<any>(apiParams);
 
             if (!response) {
                 return {
                     content: [
                         {
                             type: "text",
-                            text: "Error: Failed to fetch monthly FX data."
+                            text: `Error: Failed to fetch ${series_type} FX data.`
                         }
                     ]
                 };
             }
 
+            // Get the appropriate formatter based on the series type
+            const formatter = getFormatterBySeries(function_name);
+
             return {
                 content: [
                     {
                         type: "text",
-                        text: formatFxMonthlyTimeSeries(response, limit)
+                        text: formatter(response, limit)
                     }
                 ]
             };
